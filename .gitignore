@@ -41,4 +41,4 @@ Makefile
 /src/config.h.in~
 /src/stamp-h1
 
-/src/SparkleShareNotificationServer
+/src/FanoutPlusPlus

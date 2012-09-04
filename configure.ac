@@ -2,10 +2,10 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.68])
-AC_INIT([SparkleShareNotification], [1.00], [null@dahler.org])
+AC_INIT([FanoutPlusPlus], [1.00], [null@dahler.org])
 AM_INIT_AUTOMAKE
 
-AC_CONFIG_SRCDIR([src/SparkleShareNotificationServer.cpp])
+AC_CONFIG_SRCDIR([src/FanoutPlusPlus.cpp])
 AC_CONFIG_HEADERS([src/config.h])
 
 # Checks for programs.

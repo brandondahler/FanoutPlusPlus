@@ -1,3 +1,3 @@
-bin_PROGRAMS = SparkleShareNotificationServer
+bin_PROGRAMS = FanoutPlusPlus
 
-SparkleShareNotificationServer_SOURCES = SparkleShareNotificationServer.cpp NotificationServer.cpp NotificationChannel.cpp NotificationClientHandler.cpp
+FanoutPlusPlus_SOURCES = FanoutPlusPlus.cpp NotificationServer.cpp NotificationChannel.cpp NotificationClientHandler.cpp
