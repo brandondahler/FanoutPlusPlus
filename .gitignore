@@ -11,3 +11,34 @@ Makefile.in
 /depcomp
 /install-sh
 /missing
+
+config.log
+config.status
+config.sub
+config.guess
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+
+# Final Makefiles
+Makefile
+
+# Project specific
+/src/.deps
+
+/src/config.h
+/src/config.h.in~
+/src/stamp-h1
+
+/src/SparkleShareNotificationServer

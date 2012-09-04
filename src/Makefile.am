@@ -1,0 +1,3 @@
+bin_PROGRAMS = SparkleShareNotificationServer
+
+SparkleShareNotificationServer_SOURCES = SparkleShareNotificationServer.cpp NotificationServer.cpp NotificationChannel.cpp NotificationClientHandler.cpp
