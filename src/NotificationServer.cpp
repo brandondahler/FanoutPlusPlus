@@ -51,7 +51,7 @@ namespace NotificationServer
             WSADATA wsaData;
 
             if (WSAStartup( MAKEWORD(2,2), &wsaData) != NO_ERROR)
-               throw "Error at WSAStartup()";
+               throw "Error running WSAStartup().";
         #endif
 
         pthread_mutex_init(&serverChannelsMutex, 0);
@@ -59,11 +59,9 @@ namespace NotificationServer
 
 
         listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-        cout << errno << endl;
-
 
         if (listenSocket < 0)
-            throw "ERROR opening socket";
+            throw "Error opening listen socket.";
 
         sockaddr_in serverAddress;
         serverAddress.sin_family = AF_INET;
@@ -76,10 +74,8 @@ namespace NotificationServer
         if (bindError)
         {
             cout << errno << endl;
-            throw "ERROR on binding";
+            throw "Error binding to the listening socket.";
         }
-
-
 
         listen(listenSocket, 5);
 
@@ -88,9 +84,21 @@ namespace NotificationServer
 
     }
 
+    void WaitForServerShutdown()
+    {
+        // Wait for accept thread to end
+        pthread_join(acceptThread, NULL);
+
+        ShutdownServer();
+    }
+
 
     void ShutdownServer()
     {
+
+        pthread_cancel(acceptThread);
+        pthread_join(acceptThread, NULL);
+
         pthread_mutex_lock(&clientListMutex);
         for (list<NotificationClientHandler*>::iterator it = clientList.begin(); it != clientList.end(); ++it)
         {
@@ -109,6 +117,18 @@ namespace NotificationServer
         }
         serverChannels.clear();
         pthread_mutex_unlock(&serverChannelsMutex);
+
+        pthread_mutex_destroy(&serverChannelsMutex);
+        pthread_mutex_destroy(&clientListMutex);
+
+        #ifdef WIN32
+            closesocket(listenSocket);
+            WSACleanup();
+        #else
+            close(listenSocket);
+        #endif
+
+
     }
 
     void SubscribeToChannel(NotificationClientHandler* client, string channel)
@@ -125,10 +145,6 @@ namespace NotificationServer
         nc->AddClient(client);
 
         pthread_mutex_unlock(&serverChannelsMutex);
-
-        pthread_mutex_destroy(&serverChannelsMutex);
-        pthread_mutex_destroy(&clientListMutex);
-
     }
 
     void UnsubscribeFromChannel(NotificationClientHandler* client, string channel)
@@ -197,7 +213,7 @@ namespace NotificationServer
 
             socket_t clientSocket = accept(listenSocket, (struct sockaddr *) &clientAddress, &clientAddressSize);
             if (clientSocket < 0)
-                throw "ERROR on accept";
+                throw "AcceptClients:: Error while accepting client socket.";
 
             NotificationClientHandler* client = new NotificationClientHandler(clientSocket);
 

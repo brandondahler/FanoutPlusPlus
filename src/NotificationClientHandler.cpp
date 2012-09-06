@@ -1,6 +1,7 @@
 #include "NotificationClientHandler.h"
 
 #include "NotificationServer.h"
+#include "StringHelper.h"
 
 #include <iostream>
 #include <sstream>
@@ -17,11 +18,31 @@
    #include <sys/un.h>
 #endif
 
-
 using namespace std;
 
+/*
+ * Static constant member initializers
+ */
+const int NotificationClientHandler::COMMAND_MAX_LENGTH = 0x10000;
+
+/*
+ * Static member initializers
+ */
+NotificationClientCommands NotificationClientHandler::commands;
+pthread_mutex_t NotificationClientHandler::clientIdMutex = PTHREAD_MUTEX_INITIALIZER;
+uint64_t NotificationClientHandler::nextClientId = 0;
+
+
+/*
+ * Public methods
+ */
 NotificationClientHandler::NotificationClientHandler(socket_t cSocket)
 {
+    pthread_mutex_lock(&clientIdMutex);
+    clientId = nextClientId;
+    ++nextClientId;
+    pthread_mutex_unlock(&clientIdMutex);
+
     pthread_mutex_init(&socketMutex, 0);
     clientSocket = cSocket;
     pthread_create(&clientThread, NULL, &ProcessDataThread, (void*) this);
@@ -37,115 +58,71 @@ NotificationClientHandler::~NotificationClientHandler()
 void NotificationClientHandler::SendData(const void* data, unsigned int length)
 {
     pthread_mutex_lock(&socketMutex);
-
     send(clientSocket, (const char*) data, length, 0);
-
     pthread_mutex_unlock(&socketMutex);
 }
 
+void NotificationClientHandler::LogMessage(string message)
+{
+    cout << clientId << " :: " << message << endl;
+}
+
+/*
+ * Private methods
+ */
+
 void NotificationClientHandler::ProcessData()
 {
-    cout << "Processing data " << endl;
+    cout << "Processing data for client " << clientId << "." << endl;
     NotificationServer::SubscribeToChannel(this, "all");
 
     try
     {
-
+        ostringstream nextBuffer;
 
         while (1)
         {
-            char commandBuffer[256];
-            int commandIndex = 0;
+            int commandBufferLength = 0;
+            ostringstream commandBuffer;
 
-            // Wait until we have some command in our buffer
-            do
+            // Copy the nextBuffer into commandBuffer
+            string nextBufferString = nextBuffer.str();
+
+            commandBuffer << nextBufferString;
+            commandBufferLength += nextBufferString.length();
+
+            // Clear nextBuffer out
+            nextBuffer.str("");
+            nextBuffer.clear();
+
+            while (1)
             {
-                char peekBuffer[256];
+                char recvBuffer[256];
+                int recvLength = recv(clientSocket, recvBuffer, 256,0);
 
-                // Make sure there's atleast something
-                recv(clientSocket, peekBuffer, 1, MSG_PEEK);
-
-                int peekLength = recv(clientSocket, peekBuffer, 256, MSG_PEEK);
-
-                bool commandReceived = false;
-                for (int x = 0; x < peekLength; ++x)
+                // Find new line, break out of while loop when found
+                string recvBufferString(recvBuffer, recvLength);
+                size_t newLinePos = recvBufferString.find('\n');
+                if (newLinePos != string::npos)
                 {
-                    if (peekBuffer[x] == '\n')
-                    {
-                        // Too long to receive
-                        if (256 - (commandIndex + x + 1) < 0) throw "Invalid data received.";
-
-                        recv(clientSocket, &commandBuffer[commandIndex], x + 1, 0);
-                        commandIndex += x + 1;
-                        commandReceived = true;
-                        break;
-                    }
+                    commandBuffer << recvBufferString.substr(0, newLinePos);
+                    nextBuffer << recvBufferString.substr(newLinePos);
+                    break;
                 }
 
-                if (commandReceived)
-                    break;
-
-                // Too long to receive
-                if (256 - (commandIndex + peekLength) < 0) throw "Invalid data received.";
-
-                int recvLength = recv(clientSocket, &commandBuffer[commandIndex], peekLength, 0);
-                if (recvLength != peekLength)
-                    throw "Error reading command data.";
-
-                commandIndex += recvLength;
-            } while (commandIndex > 0 && commandBuffer[commandIndex] != '\n' && commandIndex < 256);
-
-            if (commandIndex <= 0) throw "Error reading command.";
-            if (commandIndex > 256) throw "Buffer overflow while reading command.";
-
-            istringstream oss(string(commandBuffer, commandIndex));
-            string commandString;
-
-            pthread_mutex_lock(&socketMutex);
-
-            oss >> commandString;
-            if (commandString == "ping") {
-                cout << "pong" << endl;
-                stringstream timeStringStream;
-                timeStringStream << (int) time(NULL) << "000";
-
-                string timeString;
-                timeStringStream >> timeString;
-                timeString += '\n';
-
-                send(clientSocket, timeString.c_str(), timeString.length(), 0);
-
-            } else if (commandString == "subscribe") {
-                cout << "subscribing" << endl;
-                string channel;
-                oss >> channel;
-
-                NotificationServer::SubscribeToChannel(this, channel);
-
-            } else if (commandString == "unsubscribe") {
-                cout << "unsubscribing" << endl;
-
-                string channel;
-                oss >> channel;
-
-                NotificationServer::UnsubscribeFromChannel(this, channel);
-
-            } else if (commandString == "announce") {
-                cout << "announcing" << endl;
-
-                string channel;
-                string announceHash;
-
-                oss >> channel >> announceHash;
-
-                NotificationServer::AnnounceToChannel(this, channel, announceHash);
-
-            } else {
-                pthread_mutex_unlock(&socketMutex);
-                throw "Unknown command received.";
+                // Do not allow too much data to buffer up
+                if (commandBufferLength >= COMMAND_MAX_LENGTH)
+                    throw string("Too much invalid data received from client ") + StringHelper::ToString(clientId) + ".";
             }
 
-            pthread_mutex_unlock(&socketMutex);
+            istringstream commandData(commandBuffer.str());
+            string commandString;
+
+            commandData >> commandString;
+            if (!commands.HandleCommand(*this, commandString, commandData)) {
+                pthread_mutex_unlock(&socketMutex);
+                throw string("Unknown command received from client ") + StringHelper::ToString(clientId) + ".";
+            }
         }
     } catch (const char* message) {
 

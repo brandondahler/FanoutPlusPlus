@@ -15,11 +15,16 @@ int main()
 
 
         NotificationServer::StartServer(1986);
-        while(1)
-        {
-            sleep(1);
-        }
+
+        /// TODO: Anything that is non-essential can be done in this thread.
+        ///   When done with whatever, we can jus wait for a natural shutdown.
+        cout << "Waiting for shutdown..." << endl;
+        NotificationServer::WaitForServerShutdown();
+        cout << "Shutdown completed" << endl;
+
     } catch (const char* ex) {
+        cout << ex << endl;
+    } catch (string ex) {
         cout << ex << endl;
     }
 

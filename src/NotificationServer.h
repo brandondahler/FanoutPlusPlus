@@ -9,6 +9,7 @@
 namespace NotificationServer
 {
     void StartServer(unsigned short port);
+    void WaitForServerShutdown();
     void ShutdownServer();
 
     void SubscribeToChannel(NotificationClientHandler* client, std::string channel);

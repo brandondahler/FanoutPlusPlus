@@ -1,3 +1,3 @@
 bin_PROGRAMS = FanoutPlusPlus
 
-FanoutPlusPlus_SOURCES = FanoutPlusPlus.cpp NotificationServer.cpp NotificationChannel.cpp NotificationClientHandler.cpp
+FanoutPlusPlus_SOURCES = FanoutPlusPlus.cpp NotificationServer.cpp NotificationChannel.cpp NotificationClientHandler.cpp StringHelper.cpp NotificationClientCommands.cpp
