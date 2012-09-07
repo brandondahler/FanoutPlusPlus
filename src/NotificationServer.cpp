@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include "NotificationServer.h"
 #include "NotificationClientHandler.h"
 

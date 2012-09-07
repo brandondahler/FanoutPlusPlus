@@ -17,11 +17,8 @@ AC_PROG_CXX
 AC_CHECK_HEADERS([netinet/in.h sys/socket.h unistd.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
-AC_HEADER_STDBOOL
 AC_TYPE_SIZE_T
-
-# Checks for library functions.
-AC_CHECK_FUNCS([memset socket])
+AC_TYPE_UINT64_T
 
 # Setup for Pthreads
 ACX_PTHREAD([

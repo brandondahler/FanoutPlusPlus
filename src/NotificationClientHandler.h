@@ -6,6 +6,10 @@
 #include <pthread.h>
 #include <string>
 
+#ifdef HAVE_STDINT_H
+# include <stdint.h>
+#endif
+
 typedef int socket_t;
 
 class NotificationClientHandler
