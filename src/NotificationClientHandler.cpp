@@ -102,6 +102,11 @@ void NotificationClientHandler::ProcessData()
                 char recvBuffer[256];
                 int recvLength = recv(clientSocket, recvBuffer, 256,0);
 
+                if (recvLength <= 0)
+                {
+                    return;
+                }
+
                 // Find new line, break out of while loop when found
                 string recvBufferString(recvBuffer, recvLength);
                 size_t newLinePos = recvBufferString.find('\n');
