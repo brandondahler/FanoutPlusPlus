@@ -4,9 +4,7 @@
 
 #include "NotificationServer.h"
 #include "NotificationClientHandler.h"
-#include "StringHelper.h"
 
-#include <iostream>
 
 using namespace std;
 
@@ -45,7 +43,10 @@ void NotificationClientCommands::RespondToPing(NotificationClientHandler& handle
 {
     handler.LogMessage("Pong");
 
-    string timeString = StringHelper::ToString(time(NULL)) + "000" + '\n';
+    ostringstream timeStream;
+    timeStream << time(NULL) << "000" << '\n';
+
+    string timeString = timeStream.str();
     handler.SendData(timeString.c_str(), timeString.length());
 }
 

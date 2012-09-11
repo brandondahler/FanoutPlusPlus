@@ -2,10 +2,10 @@
 
 #include "NotificationClientHandler.h"
 
+#include "FanoutLogger.h"
 #include "NotificationServer.h"
-#include "StringHelper.h"
 
-#include <iostream>
+
 #include <sstream>
 #include <time.h>
 #include <pthread.h>
@@ -66,7 +66,9 @@ void NotificationClientHandler::SendData(const void* data, unsigned int length)
 
 void NotificationClientHandler::LogMessage(string message)
 {
-    cout << clientId << " :: " << message << endl;
+    ostringstream clientSource;
+    clientSource << "NotificationClientHandler-" << clientId;
+    FanoutLogger::LogMessage(FanoutLogger::LOG_INFO, clientSource.str().c_str(), message);
 }
 
 /*
@@ -75,7 +77,12 @@ void NotificationClientHandler::LogMessage(string message)
 
 void NotificationClientHandler::ProcessData()
 {
-    cout << "Processing data for client " << clientId << "." << endl;
+    {
+        ostringstream processingMessage;
+        processingMessage << "Processing data for client " << clientId << ".";
+        FanoutLogger::LogMessage(FanoutLogger::LOG_INFO, "NotificationClientHandler", processingMessage);
+    }
+
     NotificationServer::SubscribeToChannel(this, "all");
 
     try
@@ -102,10 +109,9 @@ void NotificationClientHandler::ProcessData()
                 char recvBuffer[256];
                 int recvLength = recv(clientSocket, recvBuffer, 256,0);
 
+                // Client properly disconnected
                 if (recvLength <= 0)
-                {
                     return;
-                }
 
                 // Find new line, break out of while loop when found
                 string recvBufferString(recvBuffer, recvLength);
@@ -119,7 +125,8 @@ void NotificationClientHandler::ProcessData()
 
                 // Do not allow too much data to buffer up
                 if (commandBufferLength >= COMMAND_MAX_LENGTH)
-                    throw string("Too much invalid data received from client ") + StringHelper::ToString(clientId) + ".";
+                    throw "Too much invalid data received";
+
             }
 
             istringstream commandData(commandBuffer.str());
@@ -128,11 +135,13 @@ void NotificationClientHandler::ProcessData()
             commandData >> commandString;
             if (!commands.HandleCommand(*this, commandString, commandData)) {
                 pthread_mutex_unlock(&socketMutex);
-                throw string("Unknown command received from client ") + StringHelper::ToString(clientId) + ".";
+                throw "Unknown command received";
             }
         }
     } catch (const char* message) {
-
+        ostringstream clientSource;
+        clientSource << "NotificationClientHandler-" << clientId;
+        FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, clientSource.str().c_str(), message);
     }
 }
 

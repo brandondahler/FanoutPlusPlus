@@ -1,10 +1,10 @@
 #include "config.h"
 
 #include "NotificationServer.h"
+#include "FanoutLogger.h"
 #include "NotificationClientHandler.h"
 
-#include <iostream>
-#include <cstring>
+#include <string>
 #include <list>
 
 #include <unistd.h>
@@ -53,7 +53,10 @@ namespace NotificationServer
             WSADATA wsaData;
 
             if (WSAStartup( MAKEWORD(2,2), &wsaData) != NO_ERROR)
-               throw "Error running WSAStartup().";
+            {
+                FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", "Error running WSAStartup().");
+                return;
+            }
         #endif
 
         pthread_mutex_init(&serverChannelsMutex, 0);
@@ -63,7 +66,10 @@ namespace NotificationServer
         listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
         if (listenSocket < 0)
-            throw "Error opening listen socket.";
+        {
+            FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", "Error opening listen socket.");
+            return;
+        }
 
         sockaddr_in serverAddress;
         serverAddress.sin_family = AF_INET;
@@ -75,14 +81,19 @@ namespace NotificationServer
         int bindError = bind(listenSocket, (struct sockaddr *) &serverAddress, sizeof(serverAddress));
         if (bindError)
         {
-            cout << errno << endl;
-            throw "Error binding to the listening socket.";
+            ostringstream errorMessage;
+            errorMessage << errno << " - " << "Error binding to the listening socket.";
+            FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", errorMessage);
+            return;
         }
 
         listen(listenSocket, 5);
 
         if (pthread_create(&acceptThread, NULL, &AcceptClients, NULL) != 0)
-            throw "Error creating the accept thread.";
+        {
+            FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", "Error creating the accept thread.");
+            return;
+        }
 
     }
 
@@ -215,7 +226,10 @@ namespace NotificationServer
 
             socket_t clientSocket = accept(listenSocket, (struct sockaddr *) &clientAddress, &clientAddressSize);
             if (clientSocket < 0)
-                throw "AcceptClients:: Error while accepting client socket.";
+            {
+                FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", "Error while accepting client socket.");
+                return NULL;
+            }
 
             NotificationClientHandler* client = new NotificationClientHandler(clientSocket);
 
@@ -223,6 +237,7 @@ namespace NotificationServer
             clientList.push_back(client);
             pthread_mutex_unlock(&clientListMutex);
         }
+        return NULL;
     }
 
 }
