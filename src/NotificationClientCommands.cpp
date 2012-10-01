@@ -23,7 +23,7 @@ NotificationClientCommands::NotificationClientCommands()
 
 bool NotificationClientCommands::HandleCommand(NotificationClientHandler& handler, std::string commandName, std::istringstream& commandData)
 {
-    for (unsigned int x = 0; x < sizeof(COMMANDS); ++x)
+    for (unsigned int x = 0; x < (sizeof(COMMANDS) / sizeof(NotificationClientCommands::ClientCommand)) ; ++x)
     {
         if (COMMANDS[x].command == commandName)
         {

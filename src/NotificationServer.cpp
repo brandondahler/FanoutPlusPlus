@@ -64,6 +64,10 @@ namespace NotificationServer
 
 
         listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	
+	int reuseSocket = 1;
+	setsockopt(listenSocket, SOL_SOCKET, SO_REUSEADDR, (char*)&reuseSocket, sizeof(reuseSocket));
+
 
         if (listenSocket < 0)
         {
