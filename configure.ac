@@ -1,7 +1,7 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ([2.68])
+AC_PREREQ([2.59])
 AC_INIT([FanoutPlusPlus], [1.00], [null@dahler.org])
 AM_INIT_AUTOMAKE
 
