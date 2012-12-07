@@ -2,42 +2,57 @@
 #define NOTIFICATIONCLIENTHANDLER_H
 
 #include "NotificationClientCommands.h"
+#include "FanoutLogger.h"
 
-#include <pthread.h>
 #include <string>
+#include <sstream>
+#include <list>
 
-#ifdef HAVE_STDINT_H
-# include <stdint.h>
+#ifdef HAVE_EVENT2_UTIL_H
+    #include <event2/util.h>
 #endif
 
-typedef int socket_t;
+#ifdef HAVE_STDINT_H
+    #include <stdint.h>
+#endif
+
+struct event;
+struct event_base;
 
 class NotificationClientHandler
 {
     public:
-        NotificationClientHandler(socket_t cSocket);
+
         ~NotificationClientHandler();
 
-        void SendData(const void* data, unsigned int length);
-        void LogMessage(std::string message);
+
+        void SendData(const void* data, int length);
+        void LogMessage(std::string message, FanoutLogger::MessageSeverity severity = FanoutLogger::LOG_INFO);
+
+        static void AcceptClient(evutil_socket_t listeningSocket, short flags, void* socketParam);
+        static void CleanupClients();
 
     private:
-
         uint64_t clientId;
 
-        pthread_t clientThread;
-        socket_t clientSocket;
-        pthread_mutex_t socketMutex;
+        int clientSocket;
+        event_base* eventBase;
+        event* processEvent;
 
-        static void* ProcessDataThread(void* param);
+        std::ostringstream lastData;
+
+
+        NotificationClientHandler(int cSocket, event_base* eventBase);
+
+        static void ProcessData(evutil_socket_t clientSocket, short flags, void* processParam);
         void ProcessData();
 
+        static void SendData(evutil_socket_t clientSocket, short flags, void* sendParam);
 
         static const int COMMAND_MAX_LENGTH;
 
+        static std::list<NotificationClientHandler*> clientList;
         static NotificationClientCommands commands;
-
-        static pthread_mutex_t clientIdMutex;
         static uint64_t nextClientId;
 
 };

@@ -2,22 +2,32 @@
 
 #include "NotificationClientHandler.h"
 
-#include "FanoutLogger.h"
-#include "NotificationServer.h"
+#include "NotificationChannel.h"
 
 
 #include <sstream>
 #include <time.h>
-#include <pthread.h>
 
-#include <unistd.h>
-#include <sys/types.h>
+#ifdef HAVE_ERRNO_H
+    #include <errno.h>
+#endif
 
-#ifdef WIN32
-   #include <winsock2.h>
-#else
-   #include <sys/socket.h>
-   #include <sys/un.h>
+#ifdef HAVE_EVENT2_EVENT_H
+    #include <event2/event.h>
+#endif
+
+#ifdef HAVE_SYS_SOCKET_H
+    #include <sys/socket.h>
+#endif
+#ifdef HAVE_SYS_TYPES_H
+    #include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_UN_H
+    #include <sys/un.h>
+#endif
+
+#ifdef HAVE_UNISTD_H
+    #include <unistd.h>
 #endif
 
 using namespace std;
@@ -30,128 +40,227 @@ const int NotificationClientHandler::COMMAND_MAX_LENGTH = 0x10000;
 /*
  * Static member initializers
  */
+list<NotificationClientHandler*> NotificationClientHandler::clientList;
 NotificationClientCommands NotificationClientHandler::commands;
-pthread_mutex_t NotificationClientHandler::clientIdMutex = PTHREAD_MUTEX_INITIALIZER;
 uint64_t NotificationClientHandler::nextClientId = 0;
 
+
+struct SendState
+{
+    event_base* eventBase;
+    const void* data;
+    int length;
+    int position;
+};
 
 /*
  * Public methods
  */
-NotificationClientHandler::NotificationClientHandler(socket_t cSocket)
-{
-    pthread_mutex_lock(&clientIdMutex);
-    clientId = nextClientId;
-    ++nextClientId;
-    pthread_mutex_unlock(&clientIdMutex);
-
-    pthread_mutex_init(&socketMutex, 0);
-    clientSocket = cSocket;
-    pthread_create(&clientThread, NULL, &ProcessDataThread, (void*) this);
-}
-
 NotificationClientHandler::~NotificationClientHandler()
 {
+    clientList.remove(this);
+    NotificationChannel::UnsubscribeFromAll(this);
+
+    event_free(processEvent);
     close(clientSocket);
-    pthread_cancel(clientThread);
-    pthread_mutex_destroy(&socketMutex);
 }
 
-void NotificationClientHandler::SendData(const void* data, unsigned int length)
+void NotificationClientHandler::SendData(const void* data, int length)
 {
-    pthread_mutex_lock(&socketMutex);
-    send(clientSocket, (const char*) data, length, 0);
-    pthread_mutex_unlock(&socketMutex);
+    SendState* state = new SendState;
+    state->eventBase = eventBase;
+    state->data = data;
+    state->length = length;
+    state->position = 0;
+
+    event* sendEvent = event_new(eventBase, clientSocket, EV_WRITE, &SendData, state);
+    event_add(sendEvent, NULL);
 }
 
-void NotificationClientHandler::LogMessage(string message)
+void NotificationClientHandler::LogMessage(string message, FanoutLogger::MessageSeverity severity)
 {
     ostringstream clientSource;
     clientSource << "NotificationClientHandler-" << clientId;
-    FanoutLogger::LogMessage(FanoutLogger::LOG_INFO, clientSource.str().c_str(), message);
+    FanoutLogger::LogMessage(severity, clientSource.str().c_str(), message);
 }
+
+void NotificationClientHandler::AcceptClient(evutil_socket_t listeningSocket, short flags, void* socketParam)
+{
+    event_base* eventBase =  (event_base*) socketParam;
+
+    // Setup structs to accept with
+    sockaddr_in clientAddress;
+    memset(&clientAddress, 0, sizeof(clientAddress));
+    socklen_t clientAddressSize = sizeof(clientAddress);
+
+    // Accept client
+    int clientSocket = accept(listeningSocket, (struct sockaddr *) &clientAddress, &clientAddressSize);
+    if (clientSocket < 0)
+    {
+        FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationClientHandler", "Error while accepting client socket.");
+        return;
+    }
+
+    // Create new NotificationClientHandler and add it to the list
+    NotificationClientHandler* client = new NotificationClientHandler(clientSocket, eventBase);
+    clientList.push_back(client);
+}
+
+void NotificationClientHandler::CleanupClients()
+{
+    for (list<NotificationClientHandler*>::iterator it = clientList.begin(); it != clientList.end(); ++it)
+    {
+        if (*it)
+            delete (*it);
+    }
+    clientList.clear();
+
+
+}
+
 
 /*
  * Private methods
  */
 
+NotificationClientHandler::NotificationClientHandler(int cSocket, event_base* cEventBase) : clientSocket(cSocket), eventBase(cEventBase)
+{
+    // Set clientId
+    clientId = nextClientId;
+    ++nextClientId;
+
+    // Set socket non-blocking
+    evutil_make_socket_nonblocking(clientSocket);
+
+    // Add to all channel
+    NotificationChannel::SubscribeToChannel(this, "all");
+
+    // Setup process event
+    processEvent = event_new(eventBase, clientSocket, EV_READ|EV_PERSIST, &NotificationClientHandler::ProcessData, (void*) this);
+    event_add(processEvent, NULL);
+}
+
+void NotificationClientHandler::ProcessData(evutil_socket_t clientSocket, short flags, void* processParam)
+{
+    ((NotificationClientHandler*) processParam)->ProcessData();
+}
+
 void NotificationClientHandler::ProcessData()
 {
-    {
-        ostringstream processingMessage;
-        processingMessage << "Processing data for client " << clientId << ".";
-        FanoutLogger::LogMessage(FanoutLogger::LOG_INFO, "NotificationClientHandler", processingMessage);
-    }
-
-    NotificationServer::SubscribeToChannel(this, "all");
-
     try
     {
-        ostringstream nextBuffer;
+        char recvBuffer[256];
+        int recvLength = recv(clientSocket, recvBuffer, 256,0);
 
-        while (1)
+        // Client properly disconnected
+        if (recvLength == 0)
         {
-            int commandBufferLength = 0;
-            ostringstream commandBuffer;
+            LogMessage("Client closed gracefully");
+            delete this;
+            return;
+        }
 
-            // Copy the nextBuffer into commandBuffer
-            string nextBufferString = nextBuffer.str();
+        // Some error occurred
+        if (recvLength < 0)
+        {
+            // Just return and try agian if it would block or asks to read again
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+                return;
 
-            commandBuffer << nextBufferString;
-            commandBufferLength += nextBufferString.length();
+            // Otherwise we got a legitamate error
+            throw "Error on recv from socket";
+        }
 
-            // Clear nextBuffer out
-            nextBuffer.str("");
-            nextBuffer.clear();
+        // Process received data
+        bool newlineFound = false;
+        int curX = 0;
+        int lastX = 0;
 
-            while (1)
+        do
+        {
+            newlineFound = false;
+
+            // Try to find the next newline
+            for (int x = curX; x < recvLength; ++x)
             {
-                char recvBuffer[256];
-                int recvLength = recv(clientSocket, recvBuffer, 256,0);
-
-                // Client properly disconnected
-                if (recvLength <= 0)
-                    return;
-
-                // Find new line, break out of while loop when found
-                string recvBufferString(recvBuffer, recvLength);
-                size_t newLinePos = recvBufferString.find('\n');
-                if (newLinePos != string::npos)
+                if (recvBuffer[x] == '\n')
                 {
-                    commandBuffer << recvBufferString.substr(0, newLinePos);
-                    nextBuffer << recvBufferString.substr(newLinePos);
+                    newlineFound = true;
+                    curX = x;
                     break;
                 }
-
-                // Do not allow too much data to buffer up
-                if (commandBufferLength >= COMMAND_MAX_LENGTH)
-                    throw "Too much invalid data received";
-
             }
 
-            istringstream commandData(commandBuffer.str());
-            string commandString;
+            // Build the command if newline found
+            if (newlineFound)
+            {
+                istringstream commandData(lastData.str() + string(recvBuffer + lastX, curX - lastX));
+                string commandString;
 
-            commandData >> commandString;
-            if (!commands.HandleCommand(*this, commandString, commandData)) {
-                pthread_mutex_unlock(&socketMutex);
-                throw "Unknown command received";
+                // Read the first word of the command out and handle it
+                commandData >> commandString;
+                if (!commands.HandleCommand(*this, commandString, commandData)) {
+                    throw "Unknown command received";
+                }
+
+                // Set lastX to curX, reset lastData to a null string
+                lastX = curX;
+                lastData.str("");
             }
-        }
+
+        } while (newlineFound);
+
+        // Write out last data to a buffer
+        if (lastX != recvLength)
+            lastData.write(recvBuffer + lastX, recvLength - lastX);
+
+        // Do not allow too much data to buffer up
+        if (lastData.tellp() >= COMMAND_MAX_LENGTH)
+            throw "Too much invalid data received";
+
     } catch (const char* message) {
-        ostringstream clientSource;
-        clientSource << "NotificationClientHandler-" << clientId;
-        FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, clientSource.str().c_str(), message);
+        LogMessage(message, FanoutLogger::LOG_ERROR);
+        delete this;
+        return;
     }
 }
 
-void* NotificationClientHandler::ProcessDataThread(void* param)
+void NotificationClientHandler::SendData(evutil_socket_t clientSocket, short flags, void* sendParam)
 {
-    NotificationClientHandler* client = (NotificationClientHandler*) param;
-    client->ProcessData();
+    SendState* state = ((SendState*) sendParam);
 
-    NotificationServer::ClientClose(client);
+    // Try to send all the data
+    int dataSent = send(clientSocket, ((const char*) state->data) + state->position, (state->length - state->position), 0);
 
-    pthread_exit(0);
-    return 0;
+    // Error occurred, close socket on next recv
+    if (dataSent < 0)
+    {
+        // Add write event again if EAGAIN or EWOULDBLOCK
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+        {
+            event* sendEvent = event_new(state->eventBase, clientSocket, EV_WRITE, &SendData, state);
+            event_add(sendEvent, NULL);
+            return;
+        }
+
+        // Delete state and return otherwise
+        delete state;
+        return;
+    }
+
+    // Add length if sent successfully
+    state->position += dataSent;
+
+    // Add write event again if there is still mroe data left
+    if (state->position < state->length && state->position >= 0)
+    {
+        event* sendEvent = event_new(state->eventBase, clientSocket, EV_WRITE, &SendData, state);
+        event_add(sendEvent, NULL);
+        return;
+    }
+
+    // Otherwise just cleanup the state
+    delete state;
+    return;
 }
+

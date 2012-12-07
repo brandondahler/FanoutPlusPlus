@@ -2,24 +2,33 @@
 #define NOTIFICATIONCHANNEL_H
 
 #include <iostream>
+#include <string>
 #include <set>
+#include <map>
 
 class NotificationClientHandler;
 
 class NotificationChannel
 {
     public:
-        NotificationChannel(std::string channel) : channelName(channel) { };
+        static void CleanupChannels();
+        static void UnsubscribeFromAll(NotificationClientHandler* client);
 
-        size_t ClientCount() { return clients.size(); }
+        static void SubscribeToChannel(NotificationClientHandler* client, std::string channel);
+        static void UnsubscribeFromChannel(NotificationClientHandler* client, std::string channel);
+        static void AnnounceToChannel(NotificationClientHandler* client, std::string channel, std::string announceHash);
+
+    private:
+        NotificationChannel(std::string channel) : channelName(channel) { };
 
         void AddClient(NotificationClientHandler* client);
         void RemoveClient(NotificationClientHandler* client);
         void Announce(NotificationClientHandler* client, std::string announceHash);
 
-    private:
         std::set<NotificationClientHandler*> clients;
         std::string channelName;
+
+        static std::map<std::string, NotificationChannel*> channelMap;
 };
 
 #endif // NOTIFICATIONCHANNEL_H

@@ -1,73 +1,66 @@
 #include "config.h"
 
 #include "NotificationServer.h"
+
 #include "FanoutLogger.h"
 #include "NotificationClientHandler.h"
+#include "NotificationChannel.h"
 
 #include <string>
-#include <list>
 
-#include <unistd.h>
-#include <sys/types.h>
-
-#include <pthread.h>
-
-#ifdef WIN32
-    #include <winsock2.h>
-
-    typedef int socklen_t;
-#else
-    #include <sys/socket.h>
-    #include <sys/un.h>
-    #include <netinet/in.h>
-    #include <netinet/tcp.h>
+#ifdef HAVE_ERRNO_H
     #include <errno.h>
-
-    #define INVALID_SOCKET -1
 #endif
 
-typedef int socket_t;
+#ifdef HAVE_EVENT2_EVENT_H
+    #include <event2/event.h>
+#endif
 
+#ifdef HAVE_NETINET_IN_H
+    #include <netinet/in.h>
+#endif
+#ifdef HAVE_NETINET_TCP_H
+    #include <netinet/tcp.h>
+#endif
+
+#ifdef HAVE_SYS_SOCKET_H
+    #include <sys/socket.h>
+#endif
+#ifdef HAVE_SYS_TYPES_H
+    #include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_UN_H
+    #include <sys/un.h>
+#endif
+
+#ifdef HAVE_UNISTD_H
+    #include <unistd.h>
+#endif
 
 using namespace std;
 
 namespace NotificationServer
 {
 
-    pthread_t acceptThread;
-    pthread_mutex_t serverChannelsMutex;
-    pthread_mutex_t clientListMutex;
-
-    socket_t listenSocket = INVALID_SOCKET;
-
-    list<NotificationClientHandler*> clientList;
-    map<string, NotificationChannel*> serverChannels;
-
-
-    void* AcceptClients(void* param);
-
+    int listenSocket = -1;
+    event_base* eventBase = NULL;
 
     void StartServer(unsigned short port)
     {
-        #ifdef WIN32
-            WSADATA wsaData;
+        if (eventBase || listenSocket != -1)
+            ShutdownServer();
 
-            if (WSAStartup( MAKEWORD(2,2), &wsaData) != NO_ERROR)
-            {
-                FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", "Error running WSAStartup().");
-                return;
-            }
-        #endif
-
-        pthread_mutex_init(&serverChannelsMutex, 0);
-        pthread_mutex_init(&clientListMutex, 0);
-
+        eventBase = event_base_new();
+        if (!eventBase)
+        {
+            FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", "Error starting new event base.");
+            return;
+        }
 
         listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	
-	int reuseSocket = 1;
-	setsockopt(listenSocket, SOL_SOCKET, SO_REUSEADDR, (char*)&reuseSocket, sizeof(reuseSocket));
 
+        evutil_make_socket_nonblocking(listenSocket);
+        evutil_make_listen_socket_reuseable(listenSocket);
 
         if (listenSocket < 0)
         {
@@ -82,8 +75,7 @@ namespace NotificationServer
         memset(&serverAddress.sin_zero, 0, sizeof(serverAddress.sin_zero));
 
 
-        int bindError = bind(listenSocket, (struct sockaddr *) &serverAddress, sizeof(serverAddress));
-        if (bindError)
+        if (bind(listenSocket, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0)
         {
             ostringstream errorMessage;
             errorMessage << errno << " - " << "Error binding to the listening socket.";
@@ -91,157 +83,46 @@ namespace NotificationServer
             return;
         }
 
-        listen(listenSocket, 5);
-
-        if (pthread_create(&acceptThread, NULL, &AcceptClients, NULL) != 0)
+        if (listen(listenSocket, 5) < 0)
         {
-            FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", "Error creating the accept thread.");
+            ostringstream errorMessage;
+            errorMessage << errno << " - " << "Listening to the listening socket.";
+            FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", errorMessage);
             return;
         }
 
+
+        event* listener_event = event_new(eventBase, listenSocket, EV_READ|EV_PERSIST, &NotificationClientHandler::AcceptClient, (void*) eventBase);
+        event_add(listener_event, NULL);
+
+        event_base_dispatch(eventBase);
     }
 
     void WaitForServerShutdown()
     {
-        // Wait for accept thread to end
-        pthread_join(acceptThread, NULL);
-
         ShutdownServer();
     }
 
 
     void ShutdownServer()
     {
+        if (eventBase)
+            event_base_loopbreak(eventBase);
 
-        pthread_cancel(acceptThread);
-        pthread_join(acceptThread, NULL);
+        NotificationClientHandler::CleanupClients();
+        NotificationChannel::CleanupChannels();
 
-        pthread_mutex_lock(&clientListMutex);
-        for (list<NotificationClientHandler*>::iterator it = clientList.begin(); it != clientList.end(); ++it)
+        if (listenSocket != -1)
         {
-            if (*it)
-                delete (*it);
-        }
-        clientList.clear();
-        pthread_mutex_unlock(&clientListMutex);
-
-
-        pthread_mutex_lock(&serverChannelsMutex);
-        for (map<string, NotificationChannel*>::iterator it = serverChannels.begin(); it != serverChannels.end(); ++it)
-        {
-            if (it->second)
-                delete it->second;
-        }
-        serverChannels.clear();
-        pthread_mutex_unlock(&serverChannelsMutex);
-
-        pthread_mutex_destroy(&serverChannelsMutex);
-        pthread_mutex_destroy(&clientListMutex);
-
-        #ifdef WIN32
-            closesocket(listenSocket);
-            WSACleanup();
-        #else
             close(listenSocket);
-        #endif
-
-
-    }
-
-    void SubscribeToChannel(NotificationClientHandler* client, string channel)
-    {
-        pthread_mutex_lock(&serverChannelsMutex);
-
-        NotificationChannel* nc = serverChannels[channel];
-        if (!nc)
-        {
-            nc = new NotificationChannel(channel);
-            serverChannels[channel] = nc;
+            listenSocket = -1;
         }
 
-        nc->AddClient(client);
-
-        pthread_mutex_unlock(&serverChannelsMutex);
-    }
-
-    void UnsubscribeFromChannel(NotificationClientHandler* client, string channel)
-    {
-        pthread_mutex_lock(&serverChannelsMutex);
-
-        NotificationChannel* nc = serverChannels[channel];
-        if (!nc)
+        if (eventBase)
         {
-            pthread_mutex_unlock(&serverChannelsMutex);
-            return;
+            event_base_free(eventBase);
+            eventBase = NULL;
         }
 
-        nc->RemoveClient(client);
-
-        if (nc->ClientCount() == 0)
-        {
-            serverChannels.erase(channel);
-            delete nc;
-        }
-
-        pthread_mutex_unlock(&serverChannelsMutex);
     }
-
-    void AnnounceToChannel(NotificationClientHandler* client, string channel, string announceHash)
-    {
-        pthread_mutex_lock(&serverChannelsMutex);
-
-        NotificationChannel* nc = serverChannels[channel];
-        if (!nc)
-        {
-            pthread_mutex_unlock(&serverChannelsMutex);
-            return;
-        }
-
-        nc->Announce(client, announceHash);
-
-        pthread_mutex_unlock(&serverChannelsMutex);
-    }
-
-    void ClientClose(NotificationClientHandler* client)
-    {
-        pthread_mutex_lock(&serverChannelsMutex);
-
-        for (map<string, NotificationChannel*>::iterator it = serverChannels.begin(); it != serverChannels.end(); ++it)
-            it->second->RemoveClient(client);
-
-        pthread_mutex_unlock(&serverChannelsMutex);
-
-        pthread_mutex_lock(&clientListMutex);
-        clientList.remove(client);
-        pthread_mutex_unlock(&clientListMutex);
-
-        delete client;
-    }
-
-
-    void* AcceptClients(void* param)
-    {
-        while (true)
-        {
-            sockaddr_in clientAddress;
-            memset(&clientAddress, 0, sizeof(clientAddress));
-
-            socklen_t clientAddressSize = sizeof(clientAddress);
-
-            socket_t clientSocket = accept(listenSocket, (struct sockaddr *) &clientAddress, &clientAddressSize);
-            if (clientSocket < 0)
-            {
-                FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", "Error while accepting client socket.");
-                return NULL;
-            }
-
-            NotificationClientHandler* client = new NotificationClientHandler(clientSocket);
-
-            pthread_mutex_lock(&clientListMutex);
-            clientList.push_back(client);
-            pthread_mutex_unlock(&clientListMutex);
-        }
-        return NULL;
-    }
-
 }

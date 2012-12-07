@@ -5,13 +5,23 @@
 
 #include <string>
 
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
+#ifdef HAVE_STDLIB_H
+    #include <stdlib.h>
+#endif
 
-#ifdef WIN32
-    #include <windows.h>
-    #define sleep(n) Sleep(1000 * n)
+#ifdef HAVE_EVENT2_EVENT_H
+    #include <event2/event.h>
+#endif
+
+#ifdef HAVE_SYS_STAT_H
+    #include <sys/stat.h>
+#endif
+#ifdef HAVE_SYS_TYPES_H
+    #include <sys/types.h>
+#endif
+
+#ifdef HAVE_UNISTD_H
+    #include <unistd.h>
 #endif
 
 using namespace std;
@@ -25,16 +35,13 @@ int main(int argc, const char* argv[])
     {
         for (int x = 1; x < argc; ++x)
         {
-            if (strcmp(argv[x], "-b") == 0)
-            {
+            if (string(argv[x]) ==  "-b")
                 daemonize();
-            }
         }
     }
 
     try
     {
-
         NotificationServer::StartServer(1986);
 
         /// TODO: Anything that is non-essential can be done in this thread.

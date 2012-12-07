@@ -2,7 +2,7 @@
 
 #include "NotificationClientCommands.h"
 
-#include "NotificationServer.h"
+#include "NotificationChannel.h"
 #include "NotificationClientHandler.h"
 
 
@@ -56,7 +56,7 @@ void NotificationClientCommands::SubscribeToChannel(NotificationClientHandler& h
     commandData >> channel;
 
     handler.LogMessage(string("Subscribing to ") + channel);
-    NotificationServer::SubscribeToChannel(&handler, channel);
+    NotificationChannel::SubscribeToChannel(&handler, channel);
 }
 
 void NotificationClientCommands::UnsubscribeFromChannel(NotificationClientHandler& handler, istringstream& commandData)
@@ -65,7 +65,7 @@ void NotificationClientCommands::UnsubscribeFromChannel(NotificationClientHandle
     commandData >> channel;
 
     handler.LogMessage(string("Unsubscribing from ") + channel);
-    NotificationServer::UnsubscribeFromChannel(&handler, channel);
+    NotificationChannel::UnsubscribeFromChannel(&handler, channel);
 }
 
 void NotificationClientCommands::AnnounceToChannel(NotificationClientHandler& handler, istringstream& commandData)
@@ -77,6 +77,6 @@ void NotificationClientCommands::AnnounceToChannel(NotificationClientHandler& ha
     getline(commandData, announceData);
 
     handler.LogMessage(string("Announcing to ") + channel + " data " + announceData);
-    NotificationServer::AnnounceToChannel(&handler, channel, announceData);
+    NotificationChannel::AnnounceToChannel(&handler, channel, announceData);
 }
 
