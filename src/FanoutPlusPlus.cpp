@@ -9,10 +9,6 @@
     #include <stdlib.h>
 #endif
 
-#ifdef HAVE_EVENT2_EVENT_H
-    #include <event2/event.h>
-#endif
-
 #ifdef HAVE_SYS_STAT_H
     #include <sys/stat.h>
 #endif
