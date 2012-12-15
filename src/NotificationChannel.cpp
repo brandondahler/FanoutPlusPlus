@@ -49,7 +49,11 @@ void NotificationChannel::UnsubscribeFromAll(NotificationClientHandler* client)
 {
     // Remove client from all channels in the map
     for (map<string, NotificationChannel*>::iterator it = channelMap.begin(); it != channelMap.end(); ++it)
-        it->second->RemoveClient(client);
+    {
+        if (it->second)
+            it->second->RemoveClient(client);
+    }
+
 }
 
 void NotificationChannel::SubscribeToChannel(NotificationClientHandler* client, string channel)

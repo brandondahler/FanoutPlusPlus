@@ -43,6 +43,9 @@ namespace NotificationServer
 {
     int listenSocket = -1;
     event_base* eventBase = NULL;
+    const struct timeval cleanupTimeout = {300, 0};
+
+    void CleanupEmptyChannelsCallback(evutil_socket_t nullSocket, short flags, void* socketParam);
 
     void StartServer(unsigned short port)
     {
@@ -99,6 +102,10 @@ namespace NotificationServer
         event* listener_event = event_new(eventBase, listenSocket, EV_READ|EV_PERSIST, &NotificationClientHandler::AcceptClient, (void*) eventBase);
         event_add(listener_event, NULL);
 
+        // Cretae timer to cleanup stale channels
+        event* cleanupEmptyChannels_event = evtimer_new(eventBase, &CleanupEmptyChannelsCallback, NULL);
+        evtimer_add(cleanupEmptyChannels_event, &cleanupTimeout);
+
         // Loop through all events (more will be added
         event_base_loop(eventBase, 0);
     }
@@ -128,4 +135,10 @@ namespace NotificationServer
         }
 
     }
+
+    void CleanupEmptyChannelsCallback(evutil_socket_t nullSocket, short flags, void* socketParam)
+    {
+        NotificationChannel::CleanupEmptyChannels();
+    }
+
 }
