@@ -13,6 +13,25 @@ map<string, NotificationChannel*> NotificationChannel::channelMap;
 
 /// Static functions
 
+void NotificationChannel::CleanupEmptyChannels()
+{
+    list<string> deleteChannels;
+
+    for (map<string, NotificationChannel*>::iterator it = channelMap.begin(); it != channelMap.end(); ++it)
+    {
+        // If no more clients are in the channel, remove channel from the list and delete self
+        if (it->second->clients.size() == 0)
+        {
+            deleteChannels.push_back(it->first);
+            delete it->second;
+        }
+    }
+
+    for (list<string>::iterator it = deleteChannels.begin(); it != deleteChannels.end(); ++it)
+        channelMap.erase(*it);
+
+}
+
 void NotificationChannel::CleanupChannels()
 {
     // Delete all NotificationChannels
@@ -82,13 +101,6 @@ void NotificationChannel::RemoveClient(NotificationClientHandler* client)
 {
     // Remove client from channel
     clients.erase(client);
-
-    // If no more clients are in the channel, remove channel from the list and delete self
-    if (clients.size() == 0)
-    {
-        channelMap.erase(channelName);
-        delete this;
-    }
 }
 
 void NotificationChannel::Announce(NotificationClientHandler* client, string announceHash)

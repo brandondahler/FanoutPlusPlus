@@ -81,13 +81,13 @@ int main(int argc, char** argv)
         FanoutLogger::LogMessage(FanoutLogger::LOG_INFO, "Main", "Server shutdown.");
 
     } catch (const char* ex) {
-        NotificationServer::ShutdownServer();
         FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "Main", ex);
+        NotificationServer::ShutdownServer();
         return 1;
 
     } catch (string ex) {
-        NotificationServer::ShutdownServer();
         FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "Main", ex);
+        NotificationServer::ShutdownServer();
         return 1;
     }
 

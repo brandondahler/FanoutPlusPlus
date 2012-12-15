@@ -176,7 +176,7 @@ void NotificationClientHandler::ProcessData()
 
         // Process received data
         bool newlineFound = false;
-        int curX = 0;
+        int curX = -1;
         int lastX = 0;
 
         do
@@ -184,7 +184,7 @@ void NotificationClientHandler::ProcessData()
             newlineFound = false;
 
             // Try to find the next newline
-            for (int x = curX; x < recvLength; ++x)
+            for (int x = curX + 1; x < recvLength; ++x)
             {
                 if (recvBuffer[x] == '\n')
                 {
@@ -202,9 +202,8 @@ void NotificationClientHandler::ProcessData()
 
                 // Read the first word of the command out and handle it
                 commandData >> commandString;
-                if (!commands.HandleCommand(*this, commandString, commandData)) {
-                    throw "Unknown command received";
-                }
+                if (!commands.HandleCommand(*this, commandString, commandData))
+                    throw string("Unknown command received ") + commandString;
 
                 // Set lastX to curX, reset lastData to a null string
                 lastX = curX;
@@ -222,6 +221,12 @@ void NotificationClientHandler::ProcessData()
             throw "Too much invalid data received";
 
     } catch (const char* message) {
+        // Error ocurred, log message and delete self
+        LogMessage(message, FanoutLogger::LOG_ERROR);
+        delete this;
+        return;
+
+    } catch (string message) {
         // Error ocurred, log message and delete self
         LogMessage(message, FanoutLogger::LOG_ERROR);
         delete this;

@@ -11,6 +11,7 @@ class NotificationClientHandler;
 class NotificationChannel
 {
     public:
+        static void CleanupEmptyChannels();
         static void CleanupChannels();
         static void UnsubscribeFromAll(NotificationClientHandler* client);
 

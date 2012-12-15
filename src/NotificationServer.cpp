@@ -100,7 +100,7 @@ namespace NotificationServer
         event_add(listener_event, NULL);
 
         // Loop through all events (more will be added
-        event_base_dispatch(eventBase);
+        event_base_loop(eventBase, 0);
     }
 
     void ShutdownServer()
