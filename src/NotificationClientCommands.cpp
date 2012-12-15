@@ -102,6 +102,7 @@ void NotificationClientCommands::AnnounceToChannel(NotificationClientHandler& ha
 
     // Read in channel and announce data
     commandData >> channel;
+    commandData.ignore();
     getline(commandData, announceData);
 
     // Log announcing message
