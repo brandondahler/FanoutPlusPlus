@@ -3,7 +3,13 @@
 #include "FanoutLogger.h"
 #include "NotificationServer.h"
 
+#include <iostream>
+#include <stdio.h>
 #include <string>
+
+#ifdef HAVE_GETOPT_H
+    #include <getopt.h>
+#endif
 
 #ifdef HAVE_STDLIB_H
     #include <stdlib.h>
@@ -24,32 +30,63 @@ using namespace std;
 
 
 void daemonize();
+void displayUsage();
 
-int main(int argc, const char* argv[])
+int main(int argc, char** argv)
 {
-    if (argc > 1)
+
+    // Parse options
+    static const char* optString = "bh?";
+    static option optArray[] = {
+        {"background", 0, NULL, 'b'},
+        {"help", 0, NULL, 'h'},
+        {NULL, 0, NULL, 0}
+    };
+
+    int optSupplied;
+    int optIndex = 0;
+    while ( (optSupplied = getopt_long(argc, argv, optString, optArray, &optIndex)) != -1)
     {
-        for (int x = 1; x < argc; ++x)
+        // Convert to short option
+        if (optSupplied == 0)
+            optSupplied = optArray[optIndex].val;
+
+        // Hanle short option
+        switch (optSupplied)
         {
-            if (string(argv[x]) ==  "-b")
+            // Match long argument
+            case 'b':
                 daemonize();
+                break;
+
+            default:
+            case 'h':
+            case '?':
+                displayUsage();
+                exit(0);
+                break;
         }
     }
 
+
+    // Main loop
     try
     {
+        // Start server on port 1986, loops indefinitely
+        FanoutLogger::LogMessage(FanoutLogger::LOG_INFO, "Main", "Server started.");
         NotificationServer::StartServer(1986);
 
-        /// TODO: Anything that is non-essential can be done in this thread.
-        ///   When done with whatever, we can just wait for a natural shutdown.
-        FanoutLogger::LogMessage(FanoutLogger::LOG_INFO, "Main", "Waiting for shutdown...");
-        NotificationServer::WaitForServerShutdown();
-        FanoutLogger::LogMessage(FanoutLogger::LOG_INFO, "Main", "Shutdown completed");
+        // Shutdown the server, never will actually get here
+        NotificationServer::ShutdownServer();
+        FanoutLogger::LogMessage(FanoutLogger::LOG_INFO, "Main", "Server shutdown.");
 
     } catch (const char* ex) {
+        NotificationServer::ShutdownServer();
         FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "Main", ex);
         return 1;
+
     } catch (string ex) {
+        NotificationServer::ShutdownServer();
         FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "Main", ex);
         return 1;
     }
@@ -60,9 +97,11 @@ int main(int argc, const char* argv[])
 
 void daemonize()
 {
+    // No need to fork if no parent process
     pid_t pid, sid;
     if ( getppid() == 1 ) return;
 
+    // Fork and exit success if parent or failure if no fork
     pid = fork();
     if (pid < 0)
         exit(1);
@@ -70,16 +109,34 @@ void daemonize()
     if (pid > 0)
         exit(0);
 
-    umask(0);
+    // Set umask to 0, not sure why this is required, leaving out for now
+    // umask(0);
 
+    // Create new session so child has no controlling terminal
     sid = setsid();
     if (sid < 0)
         exit(1);
 
-    if ((chdir("/")) < 0)
+    // Change to root to prevent from holding a filesystem lock
+    if (chdir("/") < 0)
         exit(1);
 
+    // Reopen stdin, stdout, and stderr to /dev/null
     freopen( "/dev/null", "r", stdin);
     freopen( "/dev/null", "w", stdout);
     freopen( "/dev/null", "w", stderr);
 }
+
+void displayUsage()
+{
+    cout << PACKAGE_NAME << " v" << PACKAGE_VERSION << endl;
+    cout << endl;
+    cout << "Usage: " << PACKAGE_NAME << " [OPTION]" << endl;
+    cout << endl;
+    cout << "  " << "-b, --background\t\t\tBackground process, fully daemonize process." << endl;
+    cout << "  " << "-h, --help\t\t\t\tShow this usage message." << endl;
+    cout << endl;
+    cout << "Current source can be found at <" << PACKAGE_SOURCE_URL << ">." << endl;
+
+}
+

@@ -1,8 +1,9 @@
 #ifndef NOTIFICATIONCLIENTCOMMANDS_H
 #define NOTIFICATIONCLIENTCOMMANDS_H
 
-#include <string>
+#include <map>
 #include <sstream>
+#include <string>
 
 class NotificationClientHandler;
 typedef void (* CommandFunction)(NotificationClientHandler&, std::istringstream&);
@@ -15,18 +16,25 @@ class NotificationClientCommands
         bool HandleCommand(NotificationClientHandler& handler, std::string commandName, std::istringstream& commandData);
 
     protected:
-        struct ClientCommand
-        {
-            std::string command;
-            CommandFunction commandFunction;
-        };
-
-        static const ClientCommand COMMANDS[];
+        static std::map<std::string, CommandFunction> commandMap;
 
         static void RespondToPing(NotificationClientHandler& handler, std::istringstream& commandData);
         static void SubscribeToChannel(NotificationClientHandler& handler, std::istringstream& commandData);
         static void UnsubscribeFromChannel(NotificationClientHandler& handler, std::istringstream& commandData);
         static void AnnounceToChannel(NotificationClientHandler& handler, std::istringstream& commandData);
+
+    private:
+        struct ClientCommand
+        {
+            const char* command;
+            CommandFunction commandFunction;
+        };
+
+        static const ClientCommand COMMANDS[];
+        static bool commandMapCreated;
+
+        static void CreateCommandMap();
+
 
 };
 

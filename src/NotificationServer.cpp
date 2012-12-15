@@ -41,15 +41,16 @@ using namespace std;
 
 namespace NotificationServer
 {
-
     int listenSocket = -1;
     event_base* eventBase = NULL;
 
     void StartServer(unsigned short port)
     {
+        // Cleanup in case the server was started before
         if (eventBase || listenSocket != -1)
             ShutdownServer();
 
+        // Create new event base
         eventBase = event_base_new();
         if (!eventBase)
         {
@@ -57,6 +58,7 @@ namespace NotificationServer
             return;
         }
 
+        // Create new listen socket, make it non-blocking and reusable
         listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
         evutil_make_socket_nonblocking(listenSocket);
@@ -68,13 +70,14 @@ namespace NotificationServer
             return;
         }
 
+        // Listen on all addresses, port as passed in
         sockaddr_in serverAddress;
         serverAddress.sin_family = AF_INET;
         serverAddress.sin_addr.s_addr = INADDR_ANY;
         serverAddress.sin_port = htons(port);
         memset(&serverAddress.sin_zero, 0, sizeof(serverAddress.sin_zero));
 
-
+        // Bind to socket
         if (bind(listenSocket, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0)
         {
             ostringstream errorMessage;
@@ -83,6 +86,7 @@ namespace NotificationServer
             return;
         }
 
+        // Listen on socket
         if (listen(listenSocket, 5) < 0)
         {
             ostringstream errorMessage;
@@ -91,33 +95,32 @@ namespace NotificationServer
             return;
         }
 
-
+        // Create new event to accept clients, add it
         event* listener_event = event_new(eventBase, listenSocket, EV_READ|EV_PERSIST, &NotificationClientHandler::AcceptClient, (void*) eventBase);
         event_add(listener_event, NULL);
 
+        // Loop through all events (more will be added
         event_base_dispatch(eventBase);
     }
 
-    void WaitForServerShutdown()
-    {
-        ShutdownServer();
-    }
-
-
     void ShutdownServer()
     {
+        // Break the loop if event container is set
         if (eventBase)
             event_base_loopbreak(eventBase);
 
+        // Cleanup clients and channels
         NotificationClientHandler::CleanupClients();
         NotificationChannel::CleanupChannels();
 
+        // Cleanup socket if set
         if (listenSocket != -1)
         {
             close(listenSocket);
             listenSocket = -1;
         }
 
+        // Cleanup event container if set
         if (eventBase)
         {
             event_base_free(eventBase);

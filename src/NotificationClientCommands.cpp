@@ -8,63 +8,90 @@
 
 using namespace std;
 
-const NotificationClientCommands::ClientCommand NotificationClientCommands::COMMANDS[] = {
-    { string("ping"), &NotificationClientCommands::RespondToPing },
-    { string("subscribe"), &NotificationClientCommands::SubscribeToChannel },
-    { string("unsubscribe"), &NotificationClientCommands::SubscribeToChannel },
-    { string("announce"), &NotificationClientCommands::SubscribeToChannel },
 
+// Define static variable initialization
+map<string, CommandFunction> NotificationClientCommands::commandMap;
+bool NotificationClientCommands::commandMapCreated = false;
+
+
+// Define commands and their respective function pointers
+const NotificationClientCommands::ClientCommand NotificationClientCommands::COMMANDS[] = {
+    { "ping",           &NotificationClientCommands::RespondToPing  },
+    { "subscribe",      &NotificationClientCommands::SubscribeToChannel },
+    { "unsubscribe",    &NotificationClientCommands::UnsubscribeFromChannel },
+    { "announce",       &NotificationClientCommands::AnnounceToChannel }
 };
+
+
+/// Public methods
 
 NotificationClientCommands::NotificationClientCommands()
 {
+    // Check if commandMap is already created
+    if (!commandMapCreated)
+    {
+        // Create it and set commandMap as being created
+        CreateCommandMap();
+        commandMapCreated = true;
+    }
 
 }
 
 bool NotificationClientCommands::HandleCommand(NotificationClientHandler& handler, std::string commandName, std::istringstream& commandData)
 {
-    for (unsigned int x = 0; x < (sizeof(COMMANDS) / sizeof(NotificationClientCommands::ClientCommand)) ; ++x)
+    // Get command function from map
+    CommandFunction cf = commandMap[commandName];
+    if (cf)
     {
-        if (COMMANDS[x].command == commandName)
-        {
-            COMMANDS[x].commandFunction(handler, commandData);
-            return true;
-        }
+        // Call command function if defined
+        cf(handler, commandData);
+        return true;
     }
 
+    // Invalid command given
     return false;
 }
 
-/*
- *  Private functions
- */
+
+/// Protected methods
 
 void NotificationClientCommands::RespondToPing(NotificationClientHandler& handler, istringstream& commandData)
 {
+    // Log pong message
     handler.LogMessage("Pong");
 
+    // Write out time to string
     ostringstream timeStream;
     timeStream << time(NULL) << "000" << '\n';
 
+    // Convert to string, send out to client
     string timeString = timeStream.str();
     handler.SendData(timeString.c_str(), timeString.length());
 }
 
 void NotificationClientCommands::SubscribeToChannel(NotificationClientHandler& handler, istringstream& commandData)
 {
+    // Read in channel
     string channel;
     commandData >> channel;
 
+    // Log subscribing message
     handler.LogMessage(string("Subscribing to ") + channel);
+
+    // Subscribe to desired channel
     NotificationChannel::SubscribeToChannel(&handler, channel);
 }
 
 void NotificationClientCommands::UnsubscribeFromChannel(NotificationClientHandler& handler, istringstream& commandData)
 {
+    // Read in channel
     string channel;
     commandData >> channel;
 
+    // Log unsubscribing message
     handler.LogMessage(string("Unsubscribing from ") + channel);
+
+    // Unsubscribe from desired channel
     NotificationChannel::UnsubscribeFromChannel(&handler, channel);
 }
 
@@ -73,10 +100,24 @@ void NotificationClientCommands::AnnounceToChannel(NotificationClientHandler& ha
     string channel;
     string announceData;
 
+    // Read in channel and announce data
     commandData >> channel;
     getline(commandData, announceData);
 
+    // Log announcing message
     handler.LogMessage(string("Announcing to ") + channel + " data " + announceData);
+
+    // Announce desired message to desired channel
     NotificationChannel::AnnounceToChannel(&handler, channel, announceData);
+}
+
+
+/// Private static methods
+
+void NotificationClientCommands::CreateCommandMap()
+{
+    // Loop through commands and create map of commandFunctions
+    for (unsigned int x = 0; x < (sizeof(COMMANDS) / sizeof(NotificationClientCommands::ClientCommand)) ; ++x)
+        commandMap[string(COMMANDS[x].command)] = COMMANDS[x].commandFunction;
 }
 

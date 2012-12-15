@@ -32,19 +32,15 @@
 
 using namespace std;
 
-/*
- * Static constant member initializers
- */
+/// Static constant member initializers
 const int NotificationClientHandler::COMMAND_MAX_LENGTH = 0x10000;
 
-/*
- * Static member initializers
- */
+/// Static member initializers
 list<NotificationClientHandler*> NotificationClientHandler::clientList;
 NotificationClientCommands NotificationClientHandler::commands;
 uint64_t NotificationClientHandler::nextClientId = 0;
 
-
+/// Private struct declarations
 struct SendState
 {
     event_base* eventBase;
@@ -53,32 +49,37 @@ struct SendState
     int position;
 };
 
-/*
- * Public methods
- */
+
+/// Public methods
+
 NotificationClientHandler::~NotificationClientHandler()
 {
+    // Remove self from client list, unsubscribe from all channels
     clientList.remove(this);
     NotificationChannel::UnsubscribeFromAll(this);
 
+    // Free process event and close socket
     event_free(processEvent);
     close(clientSocket);
 }
 
 void NotificationClientHandler::SendData(const void* data, int length)
 {
+    // Create new local state for each send event
     SendState* state = new SendState;
     state->eventBase = eventBase;
     state->data = data;
     state->length = length;
     state->position = 0;
 
+    // Create send event and add to loop
     event* sendEvent = event_new(eventBase, clientSocket, EV_WRITE, &SendData, state);
     event_add(sendEvent, NULL);
 }
 
 void NotificationClientHandler::LogMessage(string message, FanoutLogger::MessageSeverity severity)
 {
+    // Log message (internally used for this client)
     ostringstream clientSource;
     clientSource << "NotificationClientHandler-" << clientId;
     FanoutLogger::LogMessage(severity, clientSource.str().c_str(), message);
@@ -108,20 +109,19 @@ void NotificationClientHandler::AcceptClient(evutil_socket_t listeningSocket, sh
 
 void NotificationClientHandler::CleanupClients()
 {
+    // Loop through client list and delete them
     for (list<NotificationClientHandler*>::iterator it = clientList.begin(); it != clientList.end(); ++it)
     {
         if (*it)
             delete (*it);
     }
+
+    // Clear the list
     clientList.clear();
-
-
 }
 
 
-/*
- * Private methods
- */
+/// Private methods
 
 NotificationClientHandler::NotificationClientHandler(int cSocket, event_base* cEventBase) : clientSocket(cSocket), eventBase(cEventBase)
 {
@@ -140,8 +140,10 @@ NotificationClientHandler::NotificationClientHandler(int cSocket, event_base* cE
     event_add(processEvent, NULL);
 }
 
+// Static, used as callback function, automatically calls ProcessData funciton on as client handler
 void NotificationClientHandler::ProcessData(evutil_socket_t clientSocket, short flags, void* processParam)
 {
+    // Call the ProcessData function on the client handler
     ((NotificationClientHandler*) processParam)->ProcessData();
 }
 
@@ -149,8 +151,9 @@ void NotificationClientHandler::ProcessData()
 {
     try
     {
+        // Receive up to 256 bytes of data
         char recvBuffer[256];
-        int recvLength = recv(clientSocket, recvBuffer, 256,0);
+        int recvLength = recv(clientSocket, recvBuffer, 256, 0);
 
         // Client properly disconnected
         if (recvLength == 0)
@@ -219,6 +222,7 @@ void NotificationClientHandler::ProcessData()
             throw "Too much invalid data received";
 
     } catch (const char* message) {
+        // Error ocurred, log message and delete self
         LogMessage(message, FanoutLogger::LOG_ERROR);
         delete this;
         return;
