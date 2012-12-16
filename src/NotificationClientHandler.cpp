@@ -61,6 +61,9 @@ NotificationClientHandler::~NotificationClientHandler()
     // Free process event and close socket
     event_free(processEvent);
     close(clientSocket);
+
+    // Log debug message
+    LogMessage("Client destoroyed", FanoutLogger::LOG_DEBUG);
 }
 
 void NotificationClientHandler::SendData(const void* data, int length)
@@ -138,6 +141,9 @@ NotificationClientHandler::NotificationClientHandler(int cSocket, event_base* cE
     // Setup process event
     processEvent = event_new(eventBase, clientSocket, EV_READ|EV_PERSIST, &NotificationClientHandler::ProcessData, (void*) this);
     event_add(processEvent, NULL);
+
+    // Log debug message
+    LogMessage("Client created", FanoutLogger::LOG_DEBUG);
 }
 
 // Static, used as callback function, automatically calls ProcessData funciton on as client handler
@@ -203,7 +209,12 @@ void NotificationClientHandler::ProcessData()
                 // Read the first word of the command out and handle it
                 commandData >> commandString;
                 if (!commands.HandleCommand(*this, commandString, commandData))
-                    throw string("Unknown command received ") + commandString;
+                {
+                    ostringstream unknownCommandMessage;
+                    unknownCommandMessage << "Unknown command received " << commandString;
+                    throw unknownCommandMessage.str().c_str();
+                }
+
 
                 // Set lastX to curX, reset lastData to a null string
                 lastX = curX;
@@ -221,12 +232,6 @@ void NotificationClientHandler::ProcessData()
             throw "Too much invalid data received";
 
     } catch (const char* message) {
-        // Error ocurred, log message and delete self
-        LogMessage(message, FanoutLogger::LOG_ERROR);
-        delete this;
-        return;
-
-    } catch (string message) {
         // Error ocurred, log message and delete self
         LogMessage(message, FanoutLogger::LOG_ERROR);
         delete this;
