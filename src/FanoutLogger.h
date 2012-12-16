@@ -8,11 +8,13 @@ namespace FanoutLogger
 {
         enum MessageSeverity
         {
-            LOG_ERROR = 0,
+            LOG_ERROR = 1,
             LOG_WARNING,
             LOG_INFO,
             LOG_DEBUG
         };
+
+        void SetLoggingLevel(int level);
 
         void LogMessage(MessageSeverity severity, const char* source, const char* message);
         void LogMessage(MessageSeverity severity, const char* source, std::string message);

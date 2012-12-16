@@ -34,11 +34,15 @@ void displayUsage();
 
 int main(int argc, char** argv)
 {
+    // Extern getopt stuff
+    extern char* optarg;
+
 
     // Parse options
-    static const char* optString = "bh?";
+    static const char* optString = "bl:h?";
     static option optArray[] = {
         {"background", 0, NULL, 'b'},
+        {"log-level", 1, NULL, 'l'},
         {"help", 0, NULL, 'h'},
         {NULL, 0, NULL, 0}
     };
@@ -56,15 +60,36 @@ int main(int argc, char** argv)
         {
             // Match long argument
             case 'b':
+            {
                 daemonize();
                 break;
+            }
+
+            case 'l':
+            {
+                int logLevel;
+                istringstream loggingLevelParser(optarg);
+                loggingLevelParser >> logLevel;
+
+                if (loggingLevelParser.fail() || logLevel < 0 || logLevel > 4)
+                {
+                    cout << "Invalid value " << optarg << " specified for log-level." << endl;
+                    displayUsage();
+                    exit(1);
+                }
+
+                FanoutLogger::SetLoggingLevel(logLevel);
+                break;
+            }
 
             default:
             case 'h':
             case '?':
+            {
                 displayUsage();
                 exit(0);
                 break;
+            }
         }
     }
 
@@ -133,8 +158,9 @@ void displayUsage()
     cout << endl;
     cout << "Usage: " << PACKAGE_NAME << " [OPTION]" << endl;
     cout << endl;
-    cout << "  " << "-b, --background\t\t\tBackground process, fully daemonize process." << endl;
-    cout << "  " << "-h, --help\t\t\t\tShow this usage message." << endl;
+    cout << "  " << "-b, --background\t\tBackground process, fully daemonize process." << endl;
+    cout << "  " << "-l [#], --log-level [#]\tSet logging level, valid values 0 (Silent) to 4 (LOG_DEBUG)" << endl;
+    cout << "  " << "-h, --help\t\t\tShow this usage message." << endl;
     cout << endl;
     cout << "Current source can be found at <" << PACKAGE_SOURCE_URL << ">." << endl;
 

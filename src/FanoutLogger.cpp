@@ -9,13 +9,18 @@ using namespace std;
 namespace FanoutLogger
 {
     const char* GetSeverityLabel(MessageSeverity severity);
+    int loggingLevel = LOG_INFO;
 };
 
-
+void FanoutLogger::SetLoggingLevel(int level)
+{
+    loggingLevel = level;
+}
 
 void FanoutLogger::LogMessage(MessageSeverity severity, const char* source, const char* message)
 {
-    cout << setw(7) << GetSeverityLabel(severity) << " : " << source << " :: " <<  message << endl;
+    if (severity <= loggingLevel)
+        cout << setw(7) << GetSeverityLabel(severity) << " : " << source << " :: " <<  message << endl;
 }
 
 void FanoutLogger::LogMessage(MessageSeverity severity, const char* source, string message)
