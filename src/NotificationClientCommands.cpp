@@ -76,7 +76,9 @@ void NotificationClientCommands::SubscribeToChannel(NotificationClientHandler& h
     commandData >> channel;
 
     // Log subscribing message
-    handler.LogMessage(string("Subscribing to ") + channel);
+    ostringstream logMessage;
+    logMessage << "Subscribing to " << channel;
+    handler.LogMessage(logMessage.str());
 
     // Subscribe to desired channel
     NotificationChannel::SubscribeToChannel(&handler, channel);
@@ -89,7 +91,9 @@ void NotificationClientCommands::UnsubscribeFromChannel(NotificationClientHandle
     commandData >> channel;
 
     // Log unsubscribing message
-    handler.LogMessage(string("Unsubscribing from ") + channel);
+    ostringstream logMessage;
+    logMessage << "Unsubscribing from " << channel;
+    handler.LogMessage(logMessage.str());
 
     // Unsubscribe from desired channel
     NotificationChannel::UnsubscribeFromChannel(&handler, channel);
@@ -106,7 +110,9 @@ void NotificationClientCommands::AnnounceToChannel(NotificationClientHandler& ha
     getline(commandData, announceData);
 
     // Log announcing message
-    handler.LogMessage(string("Announcing to ") + channel + " data " + announceData);
+    ostringstream logMessage;
+    logMessage << "Announcing to " << channel << " the message <" << announceData << ">";
+    handler.LogMessage(logMessage.str());
 
     // Announce desired message to desired channel
     NotificationChannel::AnnounceToChannel(&handler, channel, announceData);

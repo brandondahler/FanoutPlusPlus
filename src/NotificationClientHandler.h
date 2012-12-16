@@ -25,6 +25,7 @@ class NotificationClientHandler
 
         ~NotificationClientHandler();
 
+        uint64_t GetClientId() { return clientId; }
 
         void SendData(const void* data, int length);
         void LogMessage(std::string message, FanoutLogger::MessageSeverity severity = FanoutLogger::LOG_INFO);
