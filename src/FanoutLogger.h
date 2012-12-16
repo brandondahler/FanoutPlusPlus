@@ -10,7 +10,8 @@ namespace FanoutLogger
         {
             LOG_ERROR = 0,
             LOG_WARNING,
-            LOG_INFO
+            LOG_INFO,
+            LOG_DEBUG
         };
 
         void LogMessage(MessageSeverity severity, const char* source, const char* message);

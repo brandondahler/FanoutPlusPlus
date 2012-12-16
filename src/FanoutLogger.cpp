@@ -38,6 +38,8 @@ const char* FanoutLogger::GetSeverityLabel(MessageSeverity severity)
             return "Warning";
         case LOG_INFO:
             return "Info";
+        case LOG_DEBUG:
+            return "Debug";
     }
 
     return "Unknown";
