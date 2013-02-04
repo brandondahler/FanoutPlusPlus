@@ -37,7 +37,6 @@ const int NotificationClientHandler::COMMAND_MAX_LENGTH = 0x10000;
 
 /// Static member initializers
 list<NotificationClientHandler*> NotificationClientHandler::clientList;
-NotificationClientCommands NotificationClientHandler::commands;
 uint64_t NotificationClientHandler::nextClientId = 0;
 
 /// Private struct declarations

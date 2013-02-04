@@ -41,6 +41,8 @@ class NotificationClientHandler
         event* processEvent;
 
         std::ostringstream lastData;
+        
+	NotificationClientCommands commands;
 
 
         NotificationClientHandler(int cSocket, event_base* eventBase);
@@ -53,7 +55,6 @@ class NotificationClientHandler
         static const int COMMAND_MAX_LENGTH;
 
         static std::list<NotificationClientHandler*> clientList;
-        static NotificationClientCommands commands;
         static uint64_t nextClientId;
 
 };

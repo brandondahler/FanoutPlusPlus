@@ -124,7 +124,7 @@ void NotificationClientCommands::AnnounceToChannel(NotificationClientHandler& ha
 void NotificationClientCommands::CreateCommandMap()
 {
     // Loop through commands and create map of commandFunctions
-    for (unsigned int x = 0; x < (sizeof(COMMANDS) / sizeof(NotificationClientCommands::ClientCommand)) ; ++x)
+    for (unsigned int x = 0; x < (sizeof(COMMANDS) / sizeof(COMMANDS[0])) ; ++x)
         commandMap[string(COMMANDS[x].command)] = COMMANDS[x].commandFunction;
 }
 
