@@ -42,6 +42,10 @@ using namespace std;
 namespace NotificationServer
 {
     int listenSocket = -1;
+    #ifdef USE_IPV6
+    int listenSocketV6 = -1;
+    #endif
+
     event_base* eventBase = NULL;
     const struct timeval cleanupTimeout = {300, 0};
 
@@ -53,6 +57,12 @@ namespace NotificationServer
         if (eventBase || listenSocket != -1)
             ShutdownServer();
 
+        // Clean up if IPv6 is used and the socket is still valid
+        #ifdef USE_IPV6
+            if (listenSocketV6 != -1)
+                ShutdownServer();
+        #endif
+
         // Create new event base
         eventBase = event_base_new();
         if (!eventBase)
@@ -61,48 +71,114 @@ namespace NotificationServer
             return;
         }
 
-        // Create new listen socket, make it non-blocking and reusable
-        listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-
-        evutil_make_socket_nonblocking(listenSocket);
-        evutil_make_listen_socket_reuseable(listenSocket);
-
-        if (listenSocket < 0)
+        // Bind for IPv4
         {
-            FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", "Error opening listen socket.");
-            return;
+            // Create new listen socket, make it non-blocking and reusable
+            listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+            evutil_make_socket_nonblocking(listenSocket);
+            evutil_make_listen_socket_reuseable(listenSocket);
+
+            if (listenSocket < 0)
+            {
+                FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", "Error opening IPv4 listen socket.");
+                return;
+            }
+
+            // Listen on all IPv4 addresses, port as passed in
+            sockaddr_in serverAddress;
+            serverAddress.sin_family = AF_INET;
+            serverAddress.sin_addr.s_addr = INADDR_ANY;
+            serverAddress.sin_port = htons(port);
+            memset(&serverAddress.sin_zero, 0, sizeof(serverAddress.sin_zero));
+
+            // Bind to socket
+            if (bind(listenSocket, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0)
+            {
+                ostringstream errorMessage;
+                errorMessage << errno << " - " << "Error binding to the IPv4 listening socket.";
+                FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", errorMessage);
+                return;
+            }
+
+            // Listen on socket
+            if (listen(listenSocket, 5) < 0)
+            {
+                ostringstream errorMessage;
+                errorMessage << errno << " - " << "Listening to the IPv4 listening socket.";
+                FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", errorMessage);
+                return;
+            }
+
+            // Create new event to accept clients, add it
+            event* listener_event = event_new(eventBase, listenSocket, EV_READ|EV_PERSIST, &NotificationClientHandler::AcceptClient, (void*) eventBase);
+            event_add(listener_event, NULL);
+
+            // Create timer to cleanup stale channels
+            event* cleanupEmptyChannels_event = evtimer_new(eventBase, &CleanupEmptyChannelsCallback, NULL);
+            evtimer_add(cleanupEmptyChannels_event, &cleanupTimeout);
         }
 
-        // Listen on all addresses, port as passed in
-        sockaddr_in serverAddress;
-        serverAddress.sin_family = AF_INET;
-        serverAddress.sin_addr.s_addr = INADDR_ANY;
-        serverAddress.sin_port = htons(port);
-        memset(&serverAddress.sin_zero, 0, sizeof(serverAddress.sin_zero));
-
-        // Bind to socket
-        if (bind(listenSocket, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0)
+        #ifdef USE_IPV6
         {
-            ostringstream errorMessage;
-            errorMessage << errno << " - " << "Error binding to the listening socket.";
-            FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", errorMessage);
-            return;
+            // Create new listen socket, make it non-blocking and reusable
+            listenSocketV6 = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
+
+            evutil_make_socket_nonblocking(listenSocketV6);
+            evutil_make_listen_socket_reuseable(listenSocketV6);
+
+
+            #ifdef IPV6_V6ONLY
+            {
+                unsigned int nOne = 1;
+                if (setsockopt(listenSocketV6, IPPROTO_IPV6, IPV6_V6ONLY, (void*)&nOne, sizeof(nOne)) != 0)
+                {
+                    ostringstream errorMessage;
+                    errorMessage << errno << " - " << "Error setting IPV6_V6ONLY.";
+                    FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", errorMessage);
+                    return;
+
+                }
+            }
+            #endif
+
+            if (listenSocketV6 < 0)
+            {
+                FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", "Error opening IPv6 listen socket.");
+                return;
+            }
+
+            sockaddr_in6 serverAddress6;
+            serverAddress6.sin6_family = AF_INET6;
+            serverAddress6.sin6_addr = in6addr_any;
+            serverAddress6.sin6_port = htons(port);
+
+            // Bind to socket
+            if (bind(listenSocketV6, (struct sockaddr *) &serverAddress6, sizeof(serverAddress6)) < 0)
+            {
+                ostringstream errorMessage;
+                errorMessage << errno << " - " << "Error binding to the IPv6 listening socket.";
+                FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", errorMessage);
+                return;
+            }
+
+            // Listen on socket
+            if (listen(listenSocketV6, 5) < 0)
+            {
+                ostringstream errorMessage;
+                errorMessage << errno << " - " << "Listening to the IPv6 listening socket.";
+                FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", errorMessage);
+                return;
+            }
+
+            // Create new event to accept clients, add it
+            event* listener_v6_event = event_new(eventBase, listenSocketV6, EV_READ|EV_PERSIST, &NotificationClientHandler::AcceptClient, (void*) eventBase);
+            event_add(listener_v6_event, NULL);
+
         }
+        #endif // USE_IPV6
 
-        // Listen on socket
-        if (listen(listenSocket, 5) < 0)
-        {
-            ostringstream errorMessage;
-            errorMessage << errno << " - " << "Listening to the listening socket.";
-            FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", errorMessage);
-            return;
-        }
-
-        // Create new event to accept clients, add it
-        event* listener_event = event_new(eventBase, listenSocket, EV_READ|EV_PERSIST, &NotificationClientHandler::AcceptClient, (void*) eventBase);
-        event_add(listener_event, NULL);
-
-        // Cretae timer to cleanup stale channels
+        // Create timer to cleanup stale channels
         event* cleanupEmptyChannels_event = evtimer_new(eventBase, &CleanupEmptyChannelsCallback, NULL);
         evtimer_add(cleanupEmptyChannels_event, &cleanupTimeout);
 
@@ -126,6 +202,14 @@ namespace NotificationServer
             close(listenSocket);
             listenSocket = -1;
         }
+
+        #ifdef USE_IPV6
+            if (listenSocketV6 != -1)
+            {
+                close(listenSocketV6);
+                listenSocketV6 = -1;
+            }
+        #endif
 
         // Cleanup event container if set
         if (eventBase)

@@ -33,6 +33,23 @@ AC_CHECK_HEADERS([event2/event.h event2/util.h],
 AC_TYPE_SIZE_T
 AC_TYPE_UINT64_T
 
+# Add IPv6 feature, enable by default.
+
+AC_ARG_ENABLE([ipv6], [   --disable-ipv6         Disables IPv6 support], 
+    [case "${enableval}" in
+      yes | no ) WITH_IPV6="${enableval}" ;;
+      *) AC_MSG_ERROR(bad value ${enableval} for --disable-ipv6) ;;
+    esac],
+    [WITH_IPV6="yes"]
+)
+
+AM_CONDITIONAL([WITH_IPV6], [test "x$WITH_IPV6" = "xyes"])
+
+# Define USE_IPV6 in config.h if we're going to compile against it
+if test "x$WITH_IPV6" = "xyes"; then
+    AC_DEFINE([USE_IPV6], [1], [Build with IPv6 support])
+fi
+
 
 # Output makefiles
 AC_OUTPUT(Makefile src/Makefile)
