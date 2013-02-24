@@ -113,10 +113,6 @@ namespace NotificationServer
             // Create new event to accept clients, add it
             event* listener_event = event_new(eventBase, listenSocket, EV_READ|EV_PERSIST, &NotificationClientHandler::AcceptClient, (void*) eventBase);
             event_add(listener_event, NULL);
-
-            // Create timer to cleanup stale channels
-            event* cleanupEmptyChannels_event = evtimer_new(eventBase, &CleanupEmptyChannelsCallback, NULL);
-            evtimer_add(cleanupEmptyChannels_event, &cleanupTimeout);
         }
 
         #ifdef USE_IPV6
