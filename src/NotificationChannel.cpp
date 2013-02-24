@@ -16,7 +16,7 @@ map<string, NotificationChannel*> NotificationChannel::channelMap;
 void NotificationChannel::CleanupEmptyChannels()
 {
     // Log debug message
-    FanoutLogger::LogMessage(FanoutLogger::LOG_INFO, "NotificationChannel", "Cleaning up empty channels");
+    FanoutLogger::LogMessage(FanoutLogger::FANOUT_LOG_INFO, "NotificationChannel", "Cleaning up empty channels");
 
     // List to record what channels to delete
     list<string> deleteChannels;
@@ -29,7 +29,7 @@ void NotificationChannel::CleanupEmptyChannels()
             // Log debug message
             ostringstream logMessage;
             logMessage << "Cleaning up channel " << it->first;
-            FanoutLogger::LogMessage(FanoutLogger::LOG_DEBUG, "NotificationChannel", "Cleaning up empty channels");
+            FanoutLogger::LogMessage(FanoutLogger::FANOUT_LOG_DEBUG, "NotificationChannel", "Cleaning up empty channels");
 
             // Add channel to delete list, delete channel object
             deleteChannels.push_back(it->first);
@@ -48,7 +48,7 @@ void NotificationChannel::CleanupChannels()
     // Log debug message
     ostringstream logMessage;
     logMessage << "Cleaning up " << channelMap.size() << " channels";
-    FanoutLogger::LogMessage(FanoutLogger::LOG_DEBUG, "NotificationChannel", logMessage);
+    FanoutLogger::LogMessage(FanoutLogger::FANOUT_LOG_DEBUG, "NotificationChannel", logMessage);
 
 
     // Delete all NotificationChannels
@@ -67,7 +67,7 @@ void NotificationChannel::UnsubscribeFromAll(NotificationClientHandler* client)
     // Log debug message
     ostringstream logMessage;
     logMessage << "Unsubscribing client " << client->GetClientId() << " from all channels";
-    FanoutLogger::LogMessage(FanoutLogger::LOG_DEBUG, "NotificationChannel", logMessage);
+    FanoutLogger::LogMessage(FanoutLogger::FANOUT_LOG_DEBUG, "NotificationChannel", logMessage);
 
 
     // Remove client from all channels in the map
@@ -124,7 +124,7 @@ void NotificationChannel::AddClient(NotificationClientHandler* client)
     // Log debug message
     ostringstream logMessage;
     logMessage << "Channel "  << channelName << " adding client " << client->GetClientId();
-    FanoutLogger::LogMessage(FanoutLogger::LOG_DEBUG, "NotificationChannel", logMessage);
+    FanoutLogger::LogMessage(FanoutLogger::FANOUT_LOG_DEBUG, "NotificationChannel", logMessage);
 
     // Add client to client list
     clients.insert(client);
@@ -135,7 +135,7 @@ void NotificationChannel::RemoveClient(NotificationClientHandler* client)
     // Log debug message
     ostringstream logMessage;
     logMessage << "Channel "  << channelName << " removing client " << client->GetClientId();
-    FanoutLogger::LogMessage(FanoutLogger::LOG_DEBUG, "NotificationChannel", logMessage);
+    FanoutLogger::LogMessage(FanoutLogger::FANOUT_LOG_DEBUG, "NotificationChannel", logMessage);
 
     // Remove client from channel
     clients.erase(client);
@@ -150,7 +150,7 @@ void NotificationChannel::Announce(NotificationClientHandler* client, string ann
     // Log debug message
     ostringstream logMessage;
     logMessage << "Channel "  << channelName << " announcing message " << announcement;
-    FanoutLogger::LogMessage(FanoutLogger::LOG_DEBUG, "NotificationChannel", logMessage);
+    FanoutLogger::LogMessage(FanoutLogger::FANOUT_LOG_DEBUG, "NotificationChannel", logMessage);
 
 
     // Announce to everyone in the channel except the sender

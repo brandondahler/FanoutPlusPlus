@@ -62,7 +62,7 @@ NotificationClientHandler::~NotificationClientHandler()
     close(clientSocket);
 
     // Log debug message
-    LogMessage("Client destoroyed", FanoutLogger::LOG_DEBUG);
+    LogMessage("Client destoroyed", FanoutLogger::FANOUT_LOG_DEBUG);
 }
 
 void NotificationClientHandler::SendData(const void* data, int length)
@@ -100,7 +100,7 @@ void NotificationClientHandler::AcceptClient(evutil_socket_t listeningSocket, sh
     int clientSocket = accept(listeningSocket, (struct sockaddr *) &clientAddress, &clientAddressSize);
     if (clientSocket < 0)
     {
-        FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationClientHandler", "Error while accepting client socket.");
+        FanoutLogger::LogMessage(FanoutLogger::FANOUT_LOG_ERROR, "NotificationClientHandler", "Error while accepting client socket.");
         return;
     }
 
@@ -142,7 +142,7 @@ NotificationClientHandler::NotificationClientHandler(int cSocket, event_base* cE
     event_add(processEvent, NULL);
 
     // Log debug message
-    LogMessage("Client created", FanoutLogger::LOG_DEBUG);
+    LogMessage("Client created", FanoutLogger::FANOUT_LOG_DEBUG);
 }
 
 // Static, used as callback function, automatically calls ProcessData funciton on as client handler
@@ -232,7 +232,7 @@ void NotificationClientHandler::ProcessData()
 
     } catch (const char* message) {
         // Error ocurred, log message and delete self
-        LogMessage(message, FanoutLogger::LOG_ERROR);
+        LogMessage(message, FanoutLogger::FANOUT_LOG_ERROR);
         delete this;
         return;
     }

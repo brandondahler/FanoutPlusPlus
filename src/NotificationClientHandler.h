@@ -28,7 +28,7 @@ class NotificationClientHandler
         uint64_t GetClientId() { return clientId; }
 
         void SendData(const void* data, int length);
-        void LogMessage(std::string message, FanoutLogger::MessageSeverity severity = FanoutLogger::LOG_INFO);
+        void LogMessage(std::string message, FanoutLogger::MessageSeverity severity = FanoutLogger::FANOUT_LOG_INFO);
 
         static void AcceptClient(evutil_socket_t listeningSocket, short flags, void* socketParam);
         static void CleanupClients();
@@ -41,7 +41,7 @@ class NotificationClientHandler
         event* processEvent;
 
         std::ostringstream lastData;
-        
+
 	NotificationClientCommands commands;
 
 

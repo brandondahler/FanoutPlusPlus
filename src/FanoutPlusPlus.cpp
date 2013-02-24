@@ -98,20 +98,20 @@ int main(int argc, char** argv)
     try
     {
         // Start server on port 1986, loops indefinitely
-        FanoutLogger::LogMessage(FanoutLogger::LOG_INFO, "Main", "Server started.");
+        FanoutLogger::LogMessage(FanoutLogger::FANOUT_LOG_INFO, "Main", "Server started.");
         NotificationServer::StartServer(1986);
 
         // Shutdown the server, never will actually get here
         NotificationServer::ShutdownServer();
-        FanoutLogger::LogMessage(FanoutLogger::LOG_INFO, "Main", "Server shutdown.");
+        FanoutLogger::LogMessage(FanoutLogger::FANOUT_LOG_INFO, "Main", "Server shutdown.");
 
     } catch (const char* ex) {
-        FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "Main", ex);
+        FanoutLogger::LogMessage(FanoutLogger::FANOUT_LOG_ERROR, "Main", ex);
         NotificationServer::ShutdownServer();
         return 1;
 
     } catch (string ex) {
-        FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "Main", ex);
+        FanoutLogger::LogMessage(FanoutLogger::FANOUT_LOG_ERROR, "Main", ex);
         NotificationServer::ShutdownServer();
         return 1;
     }
@@ -159,7 +159,7 @@ void displayUsage()
     cout << "Usage: " << PACKAGE_NAME << " [OPTION]" << endl;
     cout << endl;
     cout << "  " << "-b, --background\t\tBackground process, fully daemonize process." << endl;
-    cout << "  " << "-l [#], --log-level [#]\tSet logging level, valid values 0 (Silent) to 4 (LOG_DEBUG)" << endl;
+    cout << "  " << "-l [#], --log-level [#]\tSet logging level, valid values 0 (Silent) to 4 (FANOUT_LOG_DEBUG)" << endl;
     cout << "  " << "-h, --help\t\t\tShow this usage message." << endl;
     cout << endl;
     cout << "Current source can be found at <" << PACKAGE_SOURCE_URL << ">." << endl;

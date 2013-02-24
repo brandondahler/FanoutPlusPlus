@@ -20,6 +20,8 @@ AC_PROG_CXX
 # Checks for general header files.
 AC_CHECK_HEADERS([errno.h getopt.h netinet/in.h netinet/tcp.h sys/socket.h sys/stat.h sys/un.h unistd.h])
 
+# Checks for syslog header file
+AC_CHECK_HEADERS([syslog.h])
 
 # Checks for libevent library.
 AC_CHECK_LIB([event_core], [event_dispatch], 
@@ -49,7 +51,6 @@ AM_CONDITIONAL([WITH_IPV6], [test "x$WITH_IPV6" = "xyes"])
 if test "x$WITH_IPV6" = "xyes"; then
     AC_DEFINE([USE_IPV6], [1], [Build with IPv6 support])
 fi
-
 
 # Output makefiles
 AC_OUTPUT(Makefile src/Makefile)

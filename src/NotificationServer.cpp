@@ -67,7 +67,7 @@ namespace NotificationServer
         eventBase = event_base_new();
         if (!eventBase)
         {
-            FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", "Error starting new event base.");
+            FanoutLogger::LogMessage(FanoutLogger::FANOUT_LOG_ERROR, "NotificationServer", "Error starting new event base.");
             return;
         }
 
@@ -81,7 +81,7 @@ namespace NotificationServer
 
             if (listenSocket < 0)
             {
-                FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", "Error opening IPv4 listen socket.");
+                FanoutLogger::LogMessage(FanoutLogger::FANOUT_LOG_ERROR, "NotificationServer", "Error opening IPv4 listen socket.");
                 return;
             }
 
@@ -97,7 +97,7 @@ namespace NotificationServer
             {
                 ostringstream errorMessage;
                 errorMessage << errno << " - " << "Error binding to the IPv4 listening socket.";
-                FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", errorMessage);
+                FanoutLogger::LogMessage(FanoutLogger::FANOUT_LOG_ERROR, "NotificationServer", errorMessage);
                 return;
             }
 
@@ -106,7 +106,7 @@ namespace NotificationServer
             {
                 ostringstream errorMessage;
                 errorMessage << errno << " - " << "Listening to the IPv4 listening socket.";
-                FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", errorMessage);
+                FanoutLogger::LogMessage(FanoutLogger::FANOUT_LOG_ERROR, "NotificationServer", errorMessage);
                 return;
             }
 
@@ -135,7 +135,7 @@ namespace NotificationServer
                 {
                     ostringstream errorMessage;
                     errorMessage << errno << " - " << "Error setting IPV6_V6ONLY.";
-                    FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", errorMessage);
+                    FanoutLogger::LogMessage(FanoutLogger::FANOUT_LOG_ERROR, "NotificationServer", errorMessage);
                     return;
 
                 }
@@ -144,7 +144,7 @@ namespace NotificationServer
 
             if (listenSocketV6 < 0)
             {
-                FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", "Error opening IPv6 listen socket.");
+                FanoutLogger::LogMessage(FanoutLogger::FANOUT_LOG_ERROR, "NotificationServer", "Error opening IPv6 listen socket.");
                 return;
             }
 
@@ -158,7 +158,7 @@ namespace NotificationServer
             {
                 ostringstream errorMessage;
                 errorMessage << errno << " - " << "Error binding to the IPv6 listening socket.";
-                FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", errorMessage);
+                FanoutLogger::LogMessage(FanoutLogger::FANOUT_LOG_ERROR, "NotificationServer", errorMessage);
                 return;
             }
 
@@ -167,7 +167,7 @@ namespace NotificationServer
             {
                 ostringstream errorMessage;
                 errorMessage << errno << " - " << "Listening to the IPv6 listening socket.";
-                FanoutLogger::LogMessage(FanoutLogger::LOG_ERROR, "NotificationServer", errorMessage);
+                FanoutLogger::LogMessage(FanoutLogger::FANOUT_LOG_ERROR, "NotificationServer", errorMessage);
                 return;
             }
 
