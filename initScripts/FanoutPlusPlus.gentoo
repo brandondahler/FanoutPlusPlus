@@ -1,7 +1,4 @@
 #!/sbin/runscript
-# Copyright 1999-2011 Gentoo Foundation
-# Distributed under the terms of the GNU General Public License v2
-# $Header: /var/cvsroot/gentoo-x86/mail-filter/opendkim/files/opendkim.init.r2,v 1.1 2011/06/27 07:03:04 eras Exp $
 
 depend() {
 	need net
